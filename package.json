@@ -1,0 +1,18 @@
+{
+  "name": "league-jungle-coach",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI jungle VOD reviewer with a pro-jungler coaching panel (Xun, Inspired, Canyon, Oner styles)",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.12.0",
+    "express": "^5.3.0",
+    "marked": "^18.2.1"
+  }
+}

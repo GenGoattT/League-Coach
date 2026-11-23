@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JungleCoach</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="/vendor/marked.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">◆</span> JungleCoach <small>pro-level jungle VOD review</small></div>
+    <div class="status">
+      <span id="pillClaude" class="pill">Engine: …</span>
+      <span id="pillRiot" class="pill">Riot data: …</span>
+      <button id="btnSettings" class="ghost" title="Choose the AI engine">⚙ Engine</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: video -->
+    <section class="left">
+      <div id="videoWrap" class="video-wrap">
+        <video id="vid" controls playsinline></video>
+        <canvas id="calib" class="calib" hidden></canvas>
+        <label id="drop" class="drop">
+          <input id="fileInput" type="file" accept="video/*" hidden />
+          <div class="drop-inner">
+            <div class="big">🎬</div>
+            <div><b>Drop your VOD here</b> or click to choose a file</div>
+            <div class="muted">Any recording of your game (OBS, Outplayed, Medal, replay export). It never leaves your PC; only still frames are sent to the coach.</div>
+          </div>
+        </label>
+      </div>
+
+      <div class="vid-tools">
+        <div class="clock"><span id="clockVod">VOD 00:00</span><span id="clockGame" class="game">Game --:--</span></div>
+        <div class="btns">
+          <button data-skip="-10">⟲ 10s</button>
+          <button data-skip="-3">⟲ 3s</button>
+          <button data-skip="3">3s ⟳</button>
+          <button data-skip="10">10s ⟳</button>
+          <select id="speed" title="Playback speed">
+            <option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="4">4×</option>
+          </select>
+          <button id="btnSync" title="Sync the VOD to the in-game clock">⏱ Sync clock</button>
+          <button id="btnMinimap" title="Drag a box around the minimap">🗺 Set minimap</button>
+          <button id="btnMark" class="primary" title="Hotkey: M">＋ Mark moment (M)</button>
+        </div>
+      </div>
+      <div id="markerBar" class="marker-bar" title="Flagged moments"></div>
+      <p class="hint">Tip: pause right when something happened (death, gank, objective, a decision you weren't sure about) and press <kbd>M</kbd>. The coach sees the lead-up, not just that frame.</p>
+    </section>
+
+    <!-- RIGHT: panels -->
+    <section class="right">
+      <nav class="tabs">
+        <button data-tab="setup" class="active">1 · Setup</button>
+        <button data-tab="moments">2 · Moments <span id="momentCount" class="count">0</span></button>
+        <button data-tab="game">3 · Full Game</button>
+        <button data-tab="coach">Coach</button>
+        <button data-tab="profile">My Progress</button>
+      </nav>
+
+      <!-- SETUP -->
+      <div class="panel" data-panel="setup">
+        <h3>The game</h3>
+        <div class="grid2">
+          <label>Your jungler<input id="fChampion" placeholder="e.g. Lee Sin" /></label>
+          <label>Enemy jungler<input id="fEnemyJungler" placeholder="e.g. Nidalee" /></label>
+          <label class="span2">Your team (top, jg, mid, adc, sup)<input id="fAllies" placeholder="Renekton, Lee Sin, Ahri, Jinx, Leona" /></label>
+          <label class="span2">Enemy team<input id="fEnemies" placeholder="Gnar, Nidalee, Syndra, Kai'Sa, Nautilus" /></label>
+          <label>Side<select id="fSide"><option value="">?</option><option>Blue</option><option>Red</option></select></label>
+          <label>Your rank<select id="fRank">
+            <option value="">?</option><option>Iron</option><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option><option>Emerald</option><option>Diamond</option><option>Master</option><option>Grandmaster</option><option>Challenger</option>
+          </select></label>
+          <label>Patch (optional)<input id="fPatch" placeholder="e.g. 26.23" /></label>
+          <label class="span2">What do you want to get better at?<input id="fGoals" placeholder="e.g. my early pathing, knowing when to gank vs farm" /></label>
+        </div>
+
+        <h3>Your coaching panel</h3>
+        <div id="coachCards" class="coach-cards"></div>
+        <label class="inline">Lead coach
+          <select id="fLead"><option value="">Balanced (no lead)</option></select>
+        </label>
+        <p class="muted small">Coaches are AI emulations of each pro's publicly known playstyle, not the real players, and not affiliated with them or their teams.</p>
+
+        <h3>Riot match data <span class="muted small">(optional, strongly recommended)</span></h3>
+        <p class="muted small">Pulls the real match timeline: your position and the enemy jungler's every minute, gold/CS/levels, every kill and objective. Makes the coach far more accurate.</p>
+        <div class="grid2">
+          <label>Riot ID<input id="fRiotId" placeholder="Name#TAG" /></label>
+          <label>Region<select id="fRegion">
+            <option value="americas">Americas (NA, BR, LAN, LAS)</option><option value="europe">Europe (EUW, EUNE, TR, ME)</option><option value="asia">Asia (KR, JP)</option><option value="sea">SEA/OCE (OCE, SG, TW, VN)</option>
+          </select></label>
+        </div>
+        <button id="btnFindMatches">Find my recent games</button>
+        <div id="matchList" class="match-list"></div>
+        <div id="digestInfo" class="digest-info" hidden></div>
+
+        <h3>Minimap check</h3>
+        <p class="muted small">The coach gets zoomed minimap crops. If this preview doesn't show your minimap, use <b>🗺 Set minimap</b> under the video.</p>
+        <canvas id="minimapPreview" class="minimap-preview" width="220" height="220"></canvas>
+      </div>
+
+      <!-- MOMENTS -->
+      <div class="panel" data-panel="moments" hidden>
+        <div class="row-between">
+          <h3>Flagged moments</h3>
+          <label class="inline small">Look-back
+            <select id="lookback"><option value="15">15s</option><option value="30" selected>30s</option><option value="60">60s</option><option value="90">90s</option></select>
+          </label>
+        </div>
+        <div id="momentList" class="moment-list"></div>
+        <p id="noMoments" class="muted">No moments yet. Load your VOD, pause on something, and press <kbd>M</kbd>.</p>
+      </div>
+
+      <!-- FULL GAME -->
+      <div class="panel" data-panel="game" hidden>
+        <h3>Full game review</h3>
+        <p class="muted">The coach follows your whole game through the minimap (pathing, rotations, objectives), plus full-screen snapshots and any moments you flagged, then grades you and builds your homework.</p>
+        <div class="grid2">
+          <label>Minimap sample every<select id="gInterval"><option value="20">20s</option><option value="30" selected>30s</option><option value="45">45s</option><option value="60">60s</option></select></label>
+          <label>Full-screen snapshots<select id="gFull"><option value="6">6</option><option value="12" selected>12</option><option value="20">20</option></select></label>
+          <label class="span2">Anything the coach should know?<textarea id="gNotes" rows="3" placeholder="e.g. my top was tilted, we lost every drake fight, I felt useless after 15 min"></textarea></label>
+        </div>
+        <button id="btnGameReview" class="primary big-btn">Run full game review</button>
+        <div id="gProgress" class="progress" hidden><div></div></div>
+      </div>
+
+      <!-- COACH -->
+      <div class="panel coach-panel" data-panel="coach" hidden>
+        <div id="coachEmpty" class="muted">Run a moment or full game review, or just ask your coach a question below.</div>
+        <div id="coachTitle" class="coach-title" hidden></div>
+        <details id="thinkingBox" class="thinking" hidden><summary>Coach is analyzing…</summary><div id="thinkingText"></div></details>
+        <div id="coachOut" class="md"></div>
+        <div id="chatLog" class="chat-log"></div>
+        <form id="chatForm" class="chat-form">
+          <textarea id="chatInput" rows="2" placeholder="Ask a follow-up: 'What if my mid had no prio?', 'How would Canyon path Graves into this?'"></textarea>
+          <button class="primary" type="submit">Ask</button>
+        </form>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="panel" data-panel="profile" hidden>
+        <h3>Recurring mistakes</h3>
+        <p class="muted small">Tracked across every review. The coach sees this list and calls it out when you repeat a habit.</p>
+        <ul id="habitList" class="habits"></ul>
+        <h3>Strengths</h3>
+        <ul id="strengthList" class="habits good"></ul>
+        <h3>Review history</h3>
+        <ul id="historyList" class="history"></ul>
+        <button id="btnResetProfile" class="ghost small">Reset habit tracking</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settingsDlg">
+    <form method="dialog" id="settingsForm">
+      <h3>Coach engine</h3>
+      <p class="muted small">Pick which AI powers your coach. The first two cost you nothing extra.</p>
+
+      <label class="engine" data-engine="claudecode">
+        <input type="radio" name="engine" value="claudecode" />
+        <div>
+          <div class="en-title">Claude Code · your Claude subscription <span class="badge free">$0 extra</span> <span class="badge">best quality</span></div>
+          <div class="muted small">Runs on the Claude plan you already have (Pro/Max), through the Claude Code app installed on this PC. No API key and nothing billed per review, but reviews do count toward your plan's usage limits.</div>
+          <div class="en-status" id="stCC"></div>
+          <div class="en-row">
+            <button type="button" id="btnCCLogin" class="small-btn">Log in to Claude</button>
+            <span class="inline small">Model <select id="sCCModel"><option value="opus">Opus (best)</option><option value="sonnet">Sonnet (lighter on limits)</option></select></span>
+          </div>
+        </div>
+      </label>
+
+      <label class="engine" data-engine="ollama">
+        <input type="radio" name="engine" value="ollama" />
+        <div>
+          <div class="en-title">Local AI · Ollama <span class="badge free">100% free</span> <span class="badge">offline</span></div>
+          <div class="muted small">Runs entirely on your PC and GPU. Nothing is sent anywhere. Weaker than Claude at reading the minimap, so importing Riot match data helps a lot here.</div>
+          <div class="en-status" id="stOllama"></div>
+          <div class="en-row" id="ollamaModels">
+            <span class="inline small">Vision model <select id="sOVision"></select></span>
+            <span class="inline small">Coach model <select id="sOCoach"></select></span>
+          </div>
+        </div>
+      </label>
+
+      <label class="engine" data-engine="anthropic">
+        <input type="radio" name="engine" value="anthropic" />
+        <div>
+          <div class="en-title">Claude API <span class="badge paid">pay per use</span></div>
+          <div class="muted small">Optional. Uses an API key from console.anthropic.com and is billed per review.</div>
+          <input id="sAnthropic" type="password" autocomplete="off" placeholder="sk-ant-… (leave empty to keep current)" />
+        </div>
+      </label>
+
+      <label>Riot API key <span class="muted small">(optional, free from developer.riotgames.com; dev keys expire every 24h)</span>
+        <input id="sRiot" type="password" autocomplete="off" placeholder="RGAPI-… (leave empty to keep current)" />
+      </label>
+      <p class="muted small">Settings are saved only to the <code>.env</code> file in this folder.</p>
+      <div class="row-end"><button value="cancel" class="ghost">Cancel</button><button id="btnSaveSettings" value="save" class="primary">Save</button></div>
+    </form>
+  </dialog>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
